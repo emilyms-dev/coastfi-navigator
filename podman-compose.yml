@@ -1,0 +1,42 @@
+version: "3.9"
+
+networks:
+  coastfi-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: coastfi-db
+    env_file: .env
+    # Port 5432 is intentionally NOT exposed to the host — internal networking only.
+    # The app container reaches Postgres via the coastfi-net bridge network.
+    networks:
+      - coastfi-net
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: coastfi-app
+    env_file: .env
+    ports:
+      - "8050:8050"
+    networks:
+      - coastfi-net
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped

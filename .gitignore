@@ -1,0 +1,12 @@
+.env
+__pycache__/
+.pytest_cache/
+.coverage
+dist/
+build/
+*.egg-info/
+.venv/
+htmlcov/
+.claude/
+CLAUDE.md
+PLAN.md
