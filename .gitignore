@@ -11,3 +11,5 @@ htmlcov/
 CLAUDE.md
 PLAN.md
 DEBT.md
+.agents/
+AGENTS.md
