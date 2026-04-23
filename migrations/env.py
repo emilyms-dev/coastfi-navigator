@@ -12,22 +12,25 @@ load_dotenv()
 # Alembic Config object — provides access to values in alembic.ini
 config = context.config
 
-# Wire the database URL from the environment — overrides the placeholder in alembic.ini
-config.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
+# Wire the database URL from the environment — overrides the placeholder in alembic.ini.
+# Using .get() + explicit RuntimeError produces a clear message instead of a bare KeyError
+# (DEBT Phase 1 N2 resolved here).
+_database_url = os.environ.get("DATABASE_URL")
+if not _database_url:
+    raise RuntimeError(
+        "DATABASE_URL environment variable is not set. "
+        "Copy .env.example to .env and set the value before running migrations."
+    )
+config.set_main_option("sqlalchemy.url", _database_url)
 
 # Set up loggers from alembic.ini
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Import Base from app.db.models for autogenerate support.
-# Models are not yet defined — this will be wired in Phase 3.
-try:
-    from app.db.models import Base
+# Import Base so Alembic autogenerate can diff the ORM metadata against the DB.
+from app.db.models import Base  # noqa: E402
 
-    target_metadata = Base.metadata
-except ImportError:
-    # Models not yet defined — update in Phase 3
-    target_metadata = None
+target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
