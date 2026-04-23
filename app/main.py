@@ -10,6 +10,7 @@ import time
 
 import dash
 from dotenv import load_dotenv
+from flask import jsonify, request
 from sqlalchemy import create_engine, text
 
 load_dotenv()
@@ -34,9 +35,90 @@ app = dash.Dash(
 # Expose Flask server for WSGI deployment (e.g. gunicorn)
 server = app.server
 
+# SECRET_KEY must be set — no default fallback. A missing key is a
+# deployment error that should fail loudly, not silently use an insecure value.
+server.secret_key = os.environ["SECRET_KEY"]
+
 from app.layout import build_layout  # noqa: E402 — import after app is created
+from app.auth import users as auth  # noqa: E402 — import after app is created
 
 app.layout = build_layout()
+
+# ── Auth routes ───────────────────────────────────────────────────────────────
+
+
+@server.route("/auth/register", methods=["POST"])
+def _register() -> tuple:
+    """Register a new user account.
+
+    Body: {email: str, password: str}
+
+    Returns:
+        200: {"ok": true, "email": str}
+        400: {"ok": false, "error": str}  — validation or duplicate email
+        500: {"ok": false, "error": "Registration failed"}  — unexpected error
+    """
+    body = request.get_json(silent=True) or {}
+    email = body.get("email", "")
+    password = body.get("password", "")
+    try:
+        user = auth.register_user(email, password)
+        from flask import session as flask_session
+
+        flask_session["user_id"] = user.id
+        return jsonify({"ok": True, "email": user.email}), 200
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception:
+        logger.exception("Unexpected error during registration for %r", email)
+        return jsonify({"ok": False, "error": "Registration failed"}), 500
+
+
+@server.route("/auth/login", methods=["POST"])
+def _login() -> tuple:
+    """Authenticate a user and start a session.
+
+    Body: {email: str, password: str}
+
+    Returns:
+        200: {"ok": true, "email": str}
+        401: {"ok": false, "error": "Invalid credentials"}
+    """
+    body = request.get_json(silent=True) or {}
+    email = body.get("email", "")
+    password = body.get("password", "")
+    user = auth.login_user(email, password)
+    if user is None:
+        return jsonify({"ok": False, "error": "Invalid credentials"}), 401
+    from flask import session as flask_session
+
+    flask_session["user_id"] = user.id
+    return jsonify({"ok": True, "email": user.email}), 200
+
+
+@server.route("/auth/logout", methods=["POST"])
+def _logout() -> tuple:
+    """End the current session.
+
+    Returns:
+        200: {"ok": true}  — always, regardless of prior auth state
+    """
+    auth.logout_user()
+    return jsonify({"ok": True}), 200
+
+
+@server.route("/auth/me", methods=["GET"])
+def _me() -> tuple:
+    """Return the current session's auth state.
+
+    Returns:
+        200: {"authenticated": true, "user_id": int, "email": str}
+             or {"authenticated": false}
+    """
+    user = auth.get_current_user()
+    if user is None:
+        return jsonify({"authenticated": False}), 200
+    return jsonify(auth.build_auth_store_payload(user)), 200
 
 # ── Database startup check ────────────────────────────────────────────────────
 
