@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, Index, func
+from sqlalchemy import ForeignKey, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -129,10 +129,15 @@ class ScenarioSnapshot(Base):
 
     scenario: Mapped[Scenario] = relationship("Scenario", back_populates="snapshots")
 
-    # Composite index on (scenario_id, version) speeds up the MAX(version)
-    # query in save_snapshot() and ordered snapshot retrieval.
+    # Unique constraint on (scenario_id, version) enforces append-only semantics
+    # and prevents the concurrent-write race where two sessions both read the same
+    # MAX(version) and insert duplicate version numbers.
     __table_args__ = (
-        Index("ix_scenario_snapshots_scenario_version", "scenario_id", "version"),
+        UniqueConstraint(
+            "scenario_id",
+            "version",
+            name="uq_scenario_snapshots_scenario_version",
+        ),
     )
 
     def __repr__(self) -> str:

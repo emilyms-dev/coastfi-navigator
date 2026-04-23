@@ -231,24 +231,46 @@ def get_scenario_by_share_token(token: str) -> Scenario | None:
 def save_snapshot(
     scenario_id: int,
     inputs_json: str,
+    user_id: int,
     results_json: str | None = None,
 ) -> ScenarioSnapshot:
     """Append a new immutable snapshot to a scenario.
 
-    Computes the next version number as MAX(version) + 1 for the scenario.
+    Verifies that ``user_id`` owns the scenario, then locks the scenario row
+    with SELECT FOR UPDATE before reading MAX(version). The row lock serializes
+    concurrent saves for the same scenario so that version numbers are assigned
+    without gaps or duplicates. The unique constraint on (scenario_id, version)
+    in the schema provides a final safety net.
+
     If no prior snapshots exist, version = 1. Never modifies an existing
     snapshot row — this function is the sole write path for snapshots.
 
     Args:
         scenario_id: The parent scenario's database id.
         inputs_json: JSON string produced by serialize_inputs().
+        user_id: The id of the requesting user (ownership check).
         results_json: Optional JSON string produced by serialize_results().
             May be None if the user saves before running the simulation.
 
     Returns:
         The newly created ScenarioSnapshot with its id and version populated.
+
+    Raises:
+        ValueError: If the scenario is not found or not owned by user_id.
     """
     with Session() as session:
+        # Lock the scenario row for the duration of this transaction.
+        # This serializes concurrent saves for the same scenario and enforces
+        # ownership in a single query. with_for_update() is a no-op on SQLite.
+        scenario = session.execute(
+            select(Scenario)
+            .where(Scenario.id == scenario_id, Scenario.user_id == user_id)
+            .with_for_update()
+        ).scalar_one_or_none()
+        if scenario is None:
+            raise ValueError(
+                f"Scenario {scenario_id} not found or not owned by user {user_id}."
+            )
         max_version = session.execute(
             select(func.coalesce(func.max(ScenarioSnapshot.version), 0)).where(
                 ScenarioSnapshot.scenario_id == scenario_id
@@ -268,40 +290,59 @@ def save_snapshot(
 
 def get_snapshots_for_scenario(
     scenario_id: int,
+    user_id: int,
     limit: int = 10,
 ) -> list[ScenarioSnapshot]:
     """Return recent snapshots for a scenario, newest first.
 
+    Enforces ownership via a JOIN — returns an empty list if the scenario
+    does not exist or is owned by a different user.
+
     Args:
         scenario_id: The parent scenario's database id.
+        user_id: The id of the requesting user (ownership check).
         limit: Maximum number of snapshots to return. Defaults to 10.
 
     Returns:
-        Up to ``limit`` ScenarioSnapshot objects ordered by created_at DESC.
+        Up to ``limit`` ScenarioSnapshot objects ordered by version DESC,
+        or an empty list if the scenario is not found or not owned by user_id.
     """
     with Session() as session:
         result = session.execute(
             select(ScenarioSnapshot)
-            .where(ScenarioSnapshot.scenario_id == scenario_id)
+            .join(Scenario, ScenarioSnapshot.scenario_id == Scenario.id)
+            .where(
+                ScenarioSnapshot.scenario_id == scenario_id,
+                Scenario.user_id == user_id,
+            )
             .order_by(ScenarioSnapshot.version.desc())
             .limit(limit)
         )
         return list(result.scalars().all())
 
 
-def get_latest_snapshot(scenario_id: int) -> ScenarioSnapshot | None:
+def get_latest_snapshot(scenario_id: int, user_id: int) -> ScenarioSnapshot | None:
     """Return the most recent snapshot for a scenario.
+
+    Enforces ownership via a JOIN — returns None if the scenario does not
+    exist or is owned by a different user.
 
     Args:
         scenario_id: The parent scenario's database id.
+        user_id: The id of the requesting user (ownership check).
 
     Returns:
-        The newest ScenarioSnapshot, or None if the scenario has no snapshots.
+        The newest ScenarioSnapshot, or None if the scenario has no snapshots
+        or is not owned by user_id.
     """
     with Session() as session:
         return session.execute(
             select(ScenarioSnapshot)
-            .where(ScenarioSnapshot.scenario_id == scenario_id)
+            .join(Scenario, ScenarioSnapshot.scenario_id == Scenario.id)
+            .where(
+                ScenarioSnapshot.scenario_id == scenario_id,
+                Scenario.user_id == user_id,
+            )
             .order_by(ScenarioSnapshot.version.desc())
             .limit(1)
         ).scalar_one_or_none()

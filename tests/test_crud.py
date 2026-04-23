@@ -141,15 +141,15 @@ def test_delete_scenario_removes_snapshots(db_session) -> None:
     user = crud_module.create_user("grace@example.com", "hash")
     scenario = crud_module.create_scenario(user.id, "Plan to Delete")
     inputs_json = crud_module.serialize_inputs(_make_inputs())
-    crud_module.save_snapshot(scenario.id, inputs_json)
-    crud_module.save_snapshot(scenario.id, inputs_json)
+    crud_module.save_snapshot(scenario.id, inputs_json, user.id)
+    crud_module.save_snapshot(scenario.id, inputs_json, user.id)
 
     deleted = crud_module.delete_scenario(scenario.id, user.id)
     assert deleted is True
     # Scenario is gone
     assert crud_module.get_scenario_by_id(scenario.id, user.id) is None
-    # Snapshots are gone (cascade)
-    assert crud_module.get_snapshots_for_scenario(scenario.id) == []
+    # Snapshots are gone (cascade + ownership join returns [])
+    assert crud_module.get_snapshots_for_scenario(scenario.id, user.id) == []
 
 
 def test_delete_scenario_wrong_user(db_session) -> None:
@@ -204,8 +204,8 @@ def test_save_snapshot_creates_new_row(db_session) -> None:
     scenario = crud_module.create_scenario(user.id, "Plan")
     inputs_json = crud_module.serialize_inputs(_make_inputs())
 
-    snap1 = crud_module.save_snapshot(scenario.id, inputs_json)
-    snap2 = crud_module.save_snapshot(scenario.id, inputs_json)
+    snap1 = crud_module.save_snapshot(scenario.id, inputs_json, user.id)
+    snap2 = crud_module.save_snapshot(scenario.id, inputs_json, user.id)
 
     assert snap1.id != snap2.id
     assert snap1.version == 1
@@ -218,7 +218,8 @@ def test_snapshot_version_increments(db_session) -> None:
     inputs_json = crud_module.serialize_inputs(_make_inputs())
 
     versions = [
-        crud_module.save_snapshot(scenario.id, inputs_json).version for _ in range(3)
+        crud_module.save_snapshot(scenario.id, inputs_json, user.id).version
+        for _ in range(3)
     ]
     assert versions == [1, 2, 3]
 
@@ -229,9 +230,9 @@ def test_get_latest_snapshot(db_session) -> None:
     inputs_json = crud_module.serialize_inputs(_make_inputs())
 
     for _ in range(3):
-        crud_module.save_snapshot(scenario.id, inputs_json)
+        crud_module.save_snapshot(scenario.id, inputs_json, user.id)
 
-    latest = crud_module.get_latest_snapshot(scenario.id)
+    latest = crud_module.get_latest_snapshot(scenario.id, user.id)
     assert latest is not None
     assert latest.version == 3
 
@@ -239,7 +240,7 @@ def test_get_latest_snapshot(db_session) -> None:
 def test_get_latest_snapshot_none_when_empty(db_session) -> None:
     user = crud_module.create_user("quinn@example.com", "hash")
     scenario = crud_module.create_scenario(user.id, "Empty Plan")
-    assert crud_module.get_latest_snapshot(scenario.id) is None
+    assert crud_module.get_latest_snapshot(scenario.id, user.id) is None
 
 
 def test_get_snapshots_for_scenario_limit(db_session) -> None:
@@ -248,9 +249,9 @@ def test_get_snapshots_for_scenario_limit(db_session) -> None:
     inputs_json = crud_module.serialize_inputs(_make_inputs())
 
     for _ in range(5):
-        crud_module.save_snapshot(scenario.id, inputs_json)
+        crud_module.save_snapshot(scenario.id, inputs_json, user.id)
 
-    snapshots = crud_module.get_snapshots_for_scenario(scenario.id, limit=3)
+    snapshots = crud_module.get_snapshots_for_scenario(scenario.id, user.id, limit=3)
     assert len(snapshots) == 3
 
 
@@ -259,8 +260,37 @@ def test_snapshot_results_json_optional(db_session) -> None:
     scenario = crud_module.create_scenario(user.id, "Plan")
     inputs_json = crud_module.serialize_inputs(_make_inputs())
 
-    snap = crud_module.save_snapshot(scenario.id, inputs_json, results_json=None)
+    snap = crud_module.save_snapshot(
+        scenario.id, inputs_json, user.id, results_json=None
+    )
     assert snap.results_json is None
+
+
+def test_save_snapshot_wrong_user_raises(db_session) -> None:
+    u1 = crud_module.create_user("tara@example.com", "hash")
+    u2 = crud_module.create_user("ulric@example.com", "hash")
+    scenario = crud_module.create_scenario(u1.id, "Plan")
+    inputs_json = crud_module.serialize_inputs(_make_inputs())
+    with pytest.raises(ValueError, match="not found or not owned"):
+        crud_module.save_snapshot(scenario.id, inputs_json, u2.id)
+
+
+def test_get_snapshots_wrong_user_returns_empty(db_session) -> None:
+    u1 = crud_module.create_user("vera@example.com", "hash")
+    u2 = crud_module.create_user("will@example.com", "hash")
+    scenario = crud_module.create_scenario(u1.id, "Plan")
+    inputs_json = crud_module.serialize_inputs(_make_inputs())
+    crud_module.save_snapshot(scenario.id, inputs_json, u1.id)
+    assert crud_module.get_snapshots_for_scenario(scenario.id, u2.id) == []
+
+
+def test_get_latest_snapshot_wrong_user_returns_none(db_session) -> None:
+    u1 = crud_module.create_user("xena@example.com", "hash")
+    u2 = crud_module.create_user("yuri@example.com", "hash")
+    scenario = crud_module.create_scenario(u1.id, "Plan")
+    inputs_json = crud_module.serialize_inputs(_make_inputs())
+    crud_module.save_snapshot(scenario.id, inputs_json, u1.id)
+    assert crud_module.get_latest_snapshot(scenario.id, u2.id) is None
 
 
 # ── Serialization round-trip tests ───────────────────────────────────
