@@ -42,6 +42,7 @@ server.secret_key = os.environ["SECRET_KEY"]
 from app.layout import get_layout  # noqa: E402 — import after app is created
 from app.auth import users as auth  # noqa: E402 — import after app is created
 from app.callbacks import auth as _auth_callbacks  # noqa: F401, E402 — registers auth sync callback
+from app.callbacks import calculation as _calc_callbacks  # noqa: F401, E402 — registers calculation callbacks
 
 app.layout = get_layout()
 
