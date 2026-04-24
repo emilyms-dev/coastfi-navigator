@@ -6,3 +6,4 @@ import os
 # check instantly. Individual tests that need DB access patch crud_module.Session
 # with their own per-test session.
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+os.environ.setdefault("SECRET_KEY", "test-secret-key-for-pytest")
