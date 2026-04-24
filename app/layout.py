@@ -9,21 +9,27 @@ import dash
 import dash_mantine_components as dmc
 from dash import dcc
 
+from app.auth.users import UNAUTHENTICATED_STATE
+
 # ── Theme ─────────────────────────────────────────────────────────────────────
 # Defined once here and passed to MantineProvider — never inline color hex codes.
 
 THEME = {
+    "colorScheme": "light",
     "primaryColor": "blue",
-    "fontFamily": (
-        "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, "
-        "Helvetica, Arial, sans-serif"
-    ),
+    "colors": {},
+    "fontFamily": "'Inter', 'Segoe UI', sans-serif",
+    "defaultRadius": "md",
+    "components": {
+        "Button": {"defaultProps": {"radius": "md"}},
+        "Paper": {"defaultProps": {"radius": "md", "shadow": "sm"}},
+    },
 }
 
 # ── Navbar ────────────────────────────────────────────────────────────────────
 
 
-def _build_header() -> dmc.AppShellHeader:
+def get_navbar() -> dmc.AppShellHeader:
     """Build the top application header.
 
     Returns:
@@ -38,19 +44,19 @@ def _build_header() -> dmc.AppShellHeader:
                 align="center",
                 h="100%",
                 children=[
-                    dmc.Stack(
-                        gap=0,
+                    dmc.Group(
                         children=[
-                            dmc.Title("Coast FI Navigator", order=3),
+                            dmc.Title("Coast FI Navigator", order=3, c="blue"),
                             dmc.Text(
-                                "Probabilistic financial independence planning",
-                                size="sm",
+                                "Your path to financial freedom",
+                                size="xs",
                                 c="dimmed",
+                                visibleFrom="sm",
                             ),
-                        ],
+                        ]
                     ),
-                    # Placeholder for auth buttons — populated in Phase 4
-                    dmc.Group(id="navbar-auth-controls"),
+                    # Auth controls populated by Phase 7 callback
+                    dmc.Group(id="navbar-auth-controls", children=[]),
                 ],
             )
         ],
@@ -60,7 +66,7 @@ def _build_header() -> dmc.AppShellHeader:
 # ── Layout factory ────────────────────────────────────────────────────────────
 
 
-def build_layout() -> dmc.MantineProvider:
+def get_layout() -> dmc.MantineProvider:
     """Construct and return the root application layout.
 
     Called once at startup in app/main.py. All dcc.Store components that
@@ -73,40 +79,42 @@ def build_layout() -> dmc.MantineProvider:
         theme=THEME,
         children=[
             dmc.AppShell(
-                header={"height": 64},
+                header={"height": 60},
                 padding="md",
                 children=[
-                    _build_header(),
+                    get_navbar(),
                     dmc.AppShellMain(
                         children=[
-                            # ── Client-side state stores ───────────────
-                            # Calculator input values — persisted across page navigation
+                            dmc.Container(
+                                children=[dash.page_container],
+                                size="lg",
+                                pt="xl",
+                                pb="xl",
+                            ),
+                            # ── Client-side state stores ──────────────────
                             dcc.Store(
                                 id="store-user-inputs",
                                 storage_type="session",
                             ),
-                            # Holds most recent Monte Carlo output — cleared on refresh
+                            # Persists calculator inputs across page navigation.
                             dcc.Store(
                                 id="store-simulation-results",
                                 storage_type="memory",
                             ),
-                            # ID of the currently loaded saved scenario, if any
+                            # Latest Monte Carlo output. Cleared on refresh.
                             dcc.Store(
                                 id="store-active-scenario-id",
                                 storage_type="session",
                             ),
-                            # Auth state: {authenticated: bool, user_id: int|null}
+                            # Currently loaded scenario ID, None if unsaved.
                             dcc.Store(
                                 id="store-auth-state",
                                 storage_type="session",
+                                data=UNAUTHENTICATED_STATE,
                             ),
-                            # ── Page container ────────────────────────
-                            dmc.Container(
-                                size="xl",
-                                pt="md",
-                                pb="xl",
-                                children=[dash.page_container],
-                            ),
+                            # Flask session auth state. Synced by auth callback.
+                            dcc.Location(id="url", refresh=False),
+                            # Required for programmatic navigation in callbacks.
                         ]
                     ),
                 ],
