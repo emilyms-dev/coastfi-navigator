@@ -24,6 +24,10 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 # Minimum password length enforced at registration.
 _MIN_PASSWORD_LENGTH = 8
 
+# Precomputed at import time so the unknown-email login path only calls checkpw(),
+# matching the work done by the wrong-password path and avoiding a timing oracle.
+_DUMMY_HASH: str = bcrypt.hashpw(b"dummy", bcrypt.gensalt()).decode()
+
 # Written to store-auth-state when no user is logged in.
 UNAUTHENTICATED_STATE: dict = {"authenticated": False, "user_id": None, "email": None}
 
@@ -75,7 +79,7 @@ def login_user(email: str, password: str) -> User | None:
     user = crud.get_user_by_email(email)
     if user is None:
         # Dummy check keeps timing consistent regardless of email existence.
-        bcrypt.checkpw(b"dummy", bcrypt.hashpw(b"dummy", bcrypt.gensalt()))
+        bcrypt.checkpw(b"dummy", _DUMMY_HASH.encode())
         return None
     if not bcrypt.checkpw(password.encode(), user.password_hash.encode()):
         return None

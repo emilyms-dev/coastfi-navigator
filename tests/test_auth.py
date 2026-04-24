@@ -1,18 +1,22 @@
 """Auth unit tests — Phase 4.
 
-Tests for app/auth/users.py. DB calls are mocked so these tests do not
-require a running database. Flask request context is provided via a
-minimal test Flask app.
+Tests for app/auth/users.py and Flask auth routes in app/main.py.
+Helper-layer tests mock DB calls; route-layer tests use a real SQLite
+in-memory DB so route → helper → CRUD is exercised end-to-end.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 from unittest.mock import MagicMock, patch
 
 import bcrypt
 import pytest
 from flask import Flask
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from app.auth.users import (
     UNAUTHENTICATED_STATE,
@@ -183,3 +187,124 @@ def test_password_never_logged(caplog, mock_user) -> None:
 
     assert "password" not in caplog.text.lower()
     assert secret not in caplog.text
+
+
+# ── Route-level tests ─────────────────────────────────────────────────────────
+
+
+@pytest.fixture()
+def route_client():
+    """Flask test client backed by a fresh SQLite in-memory DB.
+
+    Patches crud_module.Session so all four auth routes exercise the real
+    CRUD layer against SQLite rather than Postgres.
+    """
+    import app.db.crud as crud_module
+    from app.db.models import Base
+    from app.main import server
+
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    TestSession = sessionmaker(bind=engine, expire_on_commit=False)
+    original_session = crud_module.Session
+    crud_module.Session = TestSession
+    server.config["TESTING"] = True
+    with server.test_client() as client:
+        yield client
+    crud_module.Session = original_session
+    Base.metadata.drop_all(engine)
+    engine.dispose()
+
+
+def _post(client, path: str, body: dict):
+    return client.post(path, data=json.dumps(body), content_type="application/json")
+
+
+def _reg(client, email: str, password: str = "ValidPass1"):
+    return _post(client, "/auth/register", {"email": email, "password": password})
+
+
+def _login(client, email: str, password: str = "ValidPass1"):
+    return _post(client, "/auth/login", {"email": email, "password": password})
+
+
+def test_route_register_success(route_client) -> None:
+    """/auth/register returns 200 and sets ok=True for a valid new user."""
+    resp = _reg(route_client, "new@example.com")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["email"] == "new@example.com"
+
+
+def test_route_register_duplicate_email(route_client) -> None:
+    """/auth/register returns 400 on duplicate email."""
+    _reg(route_client, "dup@example.com")
+    resp = _reg(route_client, "dup@example.com")
+    assert resp.status_code == 400
+    assert resp.get_json()["ok"] is False
+
+
+def test_route_register_invalid_email(route_client) -> None:
+    """/auth/register returns 400 on malformed email."""
+    resp = _reg(route_client, "not-an-email")
+    assert resp.status_code == 400
+
+
+def test_route_login_success(route_client) -> None:
+    """/auth/login returns 200 for correct credentials."""
+    _reg(route_client, "login@example.com")
+    resp = _login(route_client, "login@example.com")
+    assert resp.status_code == 200
+    assert resp.get_json()["ok"] is True
+
+
+def test_route_login_wrong_password(route_client) -> None:
+    """/auth/login returns 401 for wrong password."""
+    _reg(route_client, "wp@example.com")
+    resp = _login(route_client, "wp@example.com", "WrongPass")
+    assert resp.status_code == 401
+    assert resp.get_json()["ok"] is False
+
+
+def test_route_login_unknown_email(route_client) -> None:
+    """/auth/login returns 401 for unregistered email."""
+    resp = _login(route_client, "ghost@example.com")
+    assert resp.status_code == 401
+
+
+def test_route_logout(route_client) -> None:
+    """/auth/logout returns 200 regardless of session state."""
+    resp = route_client.post("/auth/logout")
+    assert resp.status_code == 200
+    assert resp.get_json()["ok"] is True
+
+
+def test_route_me_unauthenticated(route_client) -> None:
+    """/auth/me returns authenticated=False when no session exists."""
+    resp = route_client.get("/auth/me")
+    assert resp.status_code == 200
+    assert resp.get_json()["authenticated"] is False
+
+
+def test_route_me_authenticated(route_client) -> None:
+    """/auth/me returns user fields after login."""
+    _reg(route_client, "me@example.com")
+    _login(route_client, "me@example.com")
+    resp = route_client.get("/auth/me")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["authenticated"] is True
+    assert data["email"] == "me@example.com"
+    assert isinstance(data["user_id"], int)
+
+
+def test_route_register_starts_session(route_client) -> None:
+    """/auth/register auto-logs in the new user (session contains user_id)."""
+    _reg(route_client, "autologin@example.com")
+    resp = route_client.get("/auth/me")
+    assert resp.get_json()["authenticated"] is True
