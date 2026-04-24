@@ -7,7 +7,7 @@ No callbacks are defined here — see app/callbacks/ for all callback logic.
 
 import dash
 import dash_mantine_components as dmc
-from dash import dcc, html
+from dash import dcc
 
 from app.auth.users import UNAUTHENTICATED_STATE
 
@@ -85,40 +85,36 @@ def get_layout() -> dmc.MantineProvider:
                     get_navbar(),
                     dmc.AppShellMain(
                         children=[
-                            html.Div(
-                                [
-                                    dmc.Container(
-                                        children=[dash.page_container],
-                                        size="lg",
-                                        pt="xl",
-                                        pb="xl",
-                                    ),
-                                    # ── Client-side state stores ──────────────────
-                                    dcc.Store(
-                                        id="store-user-inputs",
-                                        storage_type="session",
-                                    ),
-                                    # Persists calculator inputs across page navigation.
-                                    dcc.Store(
-                                        id="store-simulation-results",
-                                        storage_type="memory",
-                                    ),
-                                    # Latest Monte Carlo output. Cleared on refresh.
-                                    dcc.Store(
-                                        id="store-active-scenario-id",
-                                        storage_type="session",
-                                    ),
-                                    # Currently loaded scenario ID, None if unsaved.
-                                    dcc.Store(
-                                        id="store-auth-state",
-                                        storage_type="session",
-                                        data=UNAUTHENTICATED_STATE,
-                                    ),
-                                    # Flask session auth state. Synced by auth callback.
-                                    dcc.Location(id="url", refresh=False),
-                                    # Required for programmatic navigation in callbacks.
-                                ]
-                            )
+                            dmc.Container(
+                                children=[dash.page_container],
+                                size="lg",
+                                pt="xl",
+                                pb="xl",
+                            ),
+                            # ── Client-side state stores ──────────────────
+                            dcc.Store(
+                                id="store-user-inputs",
+                                storage_type="session",
+                            ),
+                            # Persists calculator inputs across page navigation.
+                            dcc.Store(
+                                id="store-simulation-results",
+                                storage_type="memory",
+                            ),
+                            # Latest Monte Carlo output. Cleared on refresh.
+                            dcc.Store(
+                                id="store-active-scenario-id",
+                                storage_type="session",
+                            ),
+                            # Currently loaded scenario ID, None if unsaved.
+                            dcc.Store(
+                                id="store-auth-state",
+                                storage_type="session",
+                                data=UNAUTHENTICATED_STATE,
+                            ),
+                            # Flask session auth state. Synced by auth callback.
+                            dcc.Location(id="url", refresh=False),
+                            # Required for programmatic navigation in callbacks.
                         ]
                     ),
                 ],
