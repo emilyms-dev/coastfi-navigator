@@ -20,13 +20,16 @@ import json
 import logging
 
 import dash
-import dash
 from dash import Input, Output, State, callback
 
 from app.components.charts import build_fan_chart
 from app.components.milestones import get_milestone_cards
 from app.components.summary import get_results_summary
-from app.engine.calculator import FIInputs, calculate_all_milestones, calculate_deterministic_projection
+from app.engine.calculator import (
+    FIInputs,
+    calculate_all_milestones,
+    calculate_deterministic_projection,
+)
 from app.engine.monte_carlo import run_simulation
 
 logger = logging.getLogger(__name__)
