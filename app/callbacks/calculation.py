@@ -20,8 +20,8 @@ import json
 import logging
 
 import dash
+import dash
 from dash import Input, Output, State, callback
-from dash.exceptions import PreventUpdate
 
 from app.components.charts import build_fan_chart
 from app.components.milestones import get_milestone_cards
@@ -142,8 +142,19 @@ def run_calculation(
         inflation_rate_pct,
         barista_income,
     ]
+    # _no_update_with_disable: returned on any validation/engine failure.
+    # UI outputs are left unchanged; interval is disabled so it stops firing.
+    _no_update_with_disable = (
+        dash.no_update,  # calc-fan-chart figure
+        dash.no_update,  # calc-summary-container children
+        dash.no_update,  # calc-milestone-container children
+        dash.no_update,  # store-simulation-results data
+        dash.no_update,  # store-user-inputs data
+        True,            # calc-debounce-trigger disabled — stop the interval
+    )
+
     if any(v is None for v in raw_inputs):
-        raise PreventUpdate
+        return _no_update_with_disable
 
     try:
         fi_inputs = FIInputs(
@@ -159,7 +170,7 @@ def run_calculation(
         )
     except (TypeError, ValueError) as exc:
         logger.warning("Input coercion failed: %s", exc)
-        raise PreventUpdate from exc
+        return _no_update_with_disable
 
     # ── 2. Engine calls ───────────────────────────────────────────────────────
     try:
@@ -168,10 +179,10 @@ def run_calculation(
         deterministic = calculate_deterministic_projection(fi_inputs)
     except ValueError as exc:
         logger.warning("Calculation validation error: %s", exc)
-        raise PreventUpdate from exc
+        return _no_update_with_disable
     except Exception:
         logger.exception("Unexpected error during FI calculation")
-        raise PreventUpdate
+        return _no_update_with_disable
 
     # ── 3. Build UI components ────────────────────────────────────────────────
     figure = build_fan_chart(
