@@ -1,13 +1,16 @@
-"""Calculator page — Phase 6.
+"""Calculator page — Phase 6 (layout) + Phase 7 (save controls).
 
 Main user-facing page. Renders the input panel on the left and the results
-panel (summary, fan chart, milestone bars) on the right. All recalculation
-logic lives in app/callbacks/calculation.py — this file is callback-free.
+panel (summary, fan chart, milestone bars, save controls) on the right.
+All recalculation logic lives in app/callbacks/calculation.py.
+All save logic lives in app/callbacks/persistence.py.
+This file is callback-free.
 """
 
 import dash
 import dash_mantine_components as dmc
 from dash import dcc, html
+from dash_iconify import DashIconify
 
 from app.components.charts import build_empty_fan_chart
 from app.components.inputs import get_input_panel
@@ -59,6 +62,33 @@ layout = dmc.Container(
                         html.Div(
                             id="calc-milestone-container",
                             children=[get_empty_milestone_cards()],
+                        ),
+                        dmc.Space(h="xl"),
+                        # ── Save controls ─────────────────────────────────────
+                        # Unauthenticated users see a Sign In prompt from the
+                        # save_scenario callback; no separate gating needed here.
+                        dmc.Paper(
+                            [
+                                dmc.Text("Save Your Plan", fw=600, mb="sm"),
+                                dmc.Group(
+                                    [
+                                        dmc.TextInput(
+                                            id="input-save-scenario-name",
+                                            placeholder='e.g. "Conservative Plan"',
+                                            style={"flex": 1},
+                                        ),
+                                        dmc.Button(
+                                            "Save",
+                                            id="btn-save-scenario",
+                                            leftSection=DashIconify(
+                                                icon="tabler:device-floppy"
+                                            ),
+                                        ),
+                                    ]
+                                ),
+                            ],
+                            p="md",
+                            withBorder=True,
                         ),
                     ],
                     span={"base": 12, "md": 8},

@@ -153,7 +153,7 @@ def run_calculation(
         dash.no_update,  # calc-milestone-container children
         dash.no_update,  # store-simulation-results data
         dash.no_update,  # store-user-inputs data
-        True,            # calc-debounce-trigger disabled — stop the interval
+        True,  # calc-debounce-trigger disabled — stop the interval
     )
 
     if any(v is None for v in raw_inputs):

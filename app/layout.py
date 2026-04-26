@@ -10,6 +10,7 @@ import dash_mantine_components as dmc
 from dash import dcc
 
 from app.auth.users import UNAUTHENTICATED_STATE
+from app.components.auth_modal import get_auth_modal
 
 # ── Theme ─────────────────────────────────────────────────────────────────────
 # Defined once here and passed to MantineProvider — never inline color hex codes.
@@ -115,6 +116,23 @@ def get_layout() -> dmc.MantineProvider:
                             # Flask session auth state. Synced by auth callback.
                             dcc.Location(id="url", refresh=False),
                             # Required for programmatic navigation in callbacks.
+                            # ── Auth modal ────────────────────────────────────
+                            # Must live at the root level so it overlays every page.
+                            get_auth_modal(),
+                            # ── Notification target ───────────────────────────
+                            # Persistence and auth callbacks write dmc.Notification
+                            # objects here. Fixed position keeps them visible above
+                            # page content without disrupting layout flow.
+                            dmc.Box(
+                                id="notifications-container",
+                                style={
+                                    "position": "fixed",
+                                    "top": "80px",
+                                    "right": "16px",
+                                    "zIndex": 9999,
+                                    "width": "320px",
+                                },
+                            ),
                         ]
                     ),
                 ],

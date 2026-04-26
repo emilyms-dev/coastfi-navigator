@@ -33,7 +33,11 @@ def get_milestone_cards(
         milestone_value: float = getattr(result, f"{key}_fi")
 
         # Progress is capped at 100 to keep the bar visually bounded.
-        pct = min(current_portfolio / milestone_value * 100.0, 100.0) if milestone_value > 0 else 0.0
+        pct = (
+            min(current_portfolio / milestone_value * 100.0, 100.0)
+            if milestone_value > 0
+            else 0.0
+        )
         color = get_progress_color(pct)
 
         cards.append(
