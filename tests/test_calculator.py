@@ -197,6 +197,23 @@ def test_barista_fi_uses_default_30pct_income_when_zero() -> None:
     assert result.barista_fi == pytest.approx(1_050_000.0)
 
 
+def test_progress_pct_barista_fully_funded_by_income() -> None:
+    # When barista_income equals annual_spending, the gap is zero, so
+    # barista_fi = 0. _progress_toward(positive_portfolio, 0) must return 100.0.
+    inputs = FIInputs(
+        current_age=30,
+        retirement_age=65,
+        current_portfolio=1.0,
+        monthly_contribution=0.0,
+        annual_spending=60_000.0,
+        nominal_return_rate=0.07,
+        inflation_rate=0.03,
+        barista_income=60_000.0,
+    )
+    result = calculate_all_milestones(inputs)
+    assert result.current_progress_pct["barista"] == 100.0
+
+
 def test_barista_fi_uses_explicit_income() -> None:
     inputs = FIInputs(
         current_age=30,

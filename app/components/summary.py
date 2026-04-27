@@ -49,7 +49,9 @@ def get_results_summary(
     """
     rate = sim_result.success_rate
 
-    # Success probability color
+    # Stat card color: 3-band ladder (≥75% green, ≥50% yellow, <50% red).
+    # The alert uses a tighter top threshold (≥85%) to distinguish "strong"
+    # from "on track" — intentionally different from the stat card ladder.
     if rate >= 0.75:
         prob_color = "green"
     elif rate >= 0.50:
@@ -57,7 +59,7 @@ def get_results_summary(
     else:
         prob_color = "red"
 
-    # Contextual alert messaging
+    # Contextual alert messaging: ≥85% / ≥50% / <50%
     if rate >= 0.85:
         alert_color = "green"
         alert_title = "Looking strong"

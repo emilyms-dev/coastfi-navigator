@@ -9,7 +9,7 @@ This file is callback-free.
 
 import dash
 import dash_mantine_components as dmc
-from dash import dcc, html
+from dash import dcc
 from dash_iconify import DashIconify
 
 from app.components.charts import build_empty_fan_chart
@@ -44,13 +44,7 @@ layout = dmc.Container(
                 # ── Right column: outputs ─────────────────────────────────────
                 dmc.GridCol(
                     [
-                        # Results summary: stat cards + contextual alert
-                        html.Div(
-                            id="calc-summary-container",
-                            children=[get_empty_summary()],
-                        ),
-                        dmc.Space(h=16),
-                        # Fan chart — primary visual, must stay above the fold
+                        # Fan chart — primary visual (CLAUDE.md: most prominent)
                         dcc.Graph(
                             id="calc-fan-chart",
                             figure=build_empty_fan_chart(),
@@ -58,8 +52,14 @@ layout = dmc.Container(
                             style={"height": "420px"},
                         ),
                         dmc.Space(h=16),
+                        # Results summary: stat cards + contextual alert
+                        dmc.Box(
+                            id="calc-summary-container",
+                            children=[get_empty_summary()],
+                        ),
+                        dmc.Space(h=16),
                         # Milestone progress bars
-                        html.Div(
+                        dmc.Box(
                             id="calc-milestone-container",
                             children=[get_empty_milestone_cards()],
                         ),

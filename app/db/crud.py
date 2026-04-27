@@ -351,7 +351,7 @@ def get_latest_snapshot(scenario_id: int, user_id: int) -> ScenarioSnapshot | No
 # ── Serialization helpers ─────────────────────────────────────────────
 
 
-def _serialize_inputs(inputs: FIInputs) -> str:
+def serialize_inputs(inputs: FIInputs) -> str:
     """Serialize a FIInputs dataclass to a JSON string.
 
     Args:
@@ -363,11 +363,11 @@ def _serialize_inputs(inputs: FIInputs) -> str:
     return json.dumps(dataclasses.asdict(inputs))
 
 
-def _deserialize_inputs(json_str: str) -> FIInputs:
+def deserialize_inputs(json_str: str) -> FIInputs:
     """Deserialize a JSON string back to a FIInputs dataclass.
 
     Args:
-        json_str: A JSON string previously produced by _serialize_inputs.
+        json_str: A JSON string previously produced by serialize_inputs.
 
     Returns:
         A FIInputs instance with all fields restored.
@@ -375,7 +375,7 @@ def _deserialize_inputs(json_str: str) -> FIInputs:
     return FIInputs(**json.loads(json_str))
 
 
-def _serialize_results(result: SimulationResult) -> str:
+def serialize_results(result: SimulationResult) -> str:
     """Serialize a SimulationResult to a JSON string.
 
     Converts int percentile keys to strings (required by JSON) and ensures
@@ -399,14 +399,14 @@ def _serialize_results(result: SimulationResult) -> str:
     return json.dumps(payload)
 
 
-def _deserialize_results(json_str: str) -> SimulationResult:
+def deserialize_results(json_str: str) -> SimulationResult:
     """Deserialize a JSON string back to a SimulationResult.
 
     Converts string percentile keys back to ints and list values back to
     the expected types.
 
     Args:
-        json_str: A JSON string previously produced by _serialize_results.
+        json_str: A JSON string previously produced by serialize_results.
 
     Returns:
         A SimulationResult instance with all fields restored.
@@ -421,11 +421,3 @@ def _deserialize_results(json_str: str) -> SimulationResult:
         percentile_bands=percentile_bands,
         inputs_snapshot=data.get("inputs_snapshot", {}),
     )
-
-
-# Public aliases used by Phase 7 callbacks so they do not need to reach
-# into private names. The private versions are used internally in this file.
-serialize_inputs = _serialize_inputs
-deserialize_inputs = _deserialize_inputs
-serialize_results = _serialize_results
-deserialize_results = _deserialize_results
