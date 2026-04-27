@@ -43,7 +43,7 @@ just the median path but the realistic range of scenarios.
 └────────────────────┬────────────────────────────────┘
                      │ HTTP / WebSocket (Dash callbacks)
 ┌────────────────────▼────────────────────────────────┐
-│  App container  (Python 3.12 + Gunicorn/Dash)       │
+│  App container  (Python 3.11 + Dash / Werkzeug)     │
 │                                                     │
 │  app/engine/         — pure FI math, Monte Carlo    │
 │  app/db/crud.py      — all DB reads/writes          │
@@ -55,7 +55,7 @@ just the median path but the realistic range of scenarios.
 └────────────────────┬────────────────────────────────┘
                      │ SQLAlchemy (psycopg2)
 ┌────────────────────▼────────────────────────────────┐
-│  PostgreSQL 15 container                            │
+│  PostgreSQL 16 container                            │
 │  users · scenarios · scenario_snapshots             │
 └─────────────────────────────────────────────────────┘
 ```

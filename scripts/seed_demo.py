@@ -17,6 +17,7 @@ import logging
 import os
 import sys
 
+import bcrypt
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -38,6 +39,8 @@ from app.engine.calculator import FIInputs  # noqa: E402
 from app.engine.monte_carlo import run_simulation  # noqa: E402
 
 # ── Demo user credentials ──────────────────────────────────────────────────────
+# These are intentionally public test credentials for local development and
+# demos only. Do not run this script against a production database.
 
 DEMO_EMAIL = "demo@coastfi.example"
 DEMO_PASSWORD = "demo1234"
@@ -102,10 +105,12 @@ def seed() -> None:
     # ── User ──────────────────────────────────────────────────────────────────
     existing_user = crud.get_user_by_email(DEMO_EMAIL)
     if existing_user is not None:
-        logger.info("Demo user already exists (id=%d) — skipping user creation.", existing_user.id)
+        logger.info(
+            "Demo user already exists (id=%d) — skipping user creation.",
+            existing_user.id,
+        )
         user = existing_user
     else:
-        import bcrypt
         pw_hash = bcrypt.hashpw(DEMO_PASSWORD.encode(), bcrypt.gensalt()).decode()
         user = crud.create_user(DEMO_EMAIL, pw_hash)
         logger.info("Created demo user: %s (id=%d)", DEMO_EMAIL, user.id)

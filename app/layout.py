@@ -140,6 +140,6 @@ def get_layout() -> dmc.MantineProvider:
                         ]
                     ),
                 ],
-            )
+            ),
         ],
     )

@@ -185,9 +185,7 @@ def _wait_for_database() -> None:
         try:
             with engine.connect() as connection:
                 connection.execute(text("SELECT 1"))
-            logger.info(
-                "Database connection established on attempt %d.", attempt
-            )
+            logger.info("Database connection established on attempt %d.", attempt)
             return
         except Exception as exc:  # noqa: BLE001
             logger.warning(
