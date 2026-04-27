@@ -13,10 +13,12 @@ Callback registration order within this file determines which callback
   - load_scenario    uses allow_duplicate=True for all shared outputs
   - generate_share_link  uses allow_duplicate=True for notifications-container
   - load_dashboard_scenarios  uses allow_duplicate=True for dashboard-scenario-list
+  - hydrate_inputs_from_store  uses allow_duplicate=True for all 8 input value props
 """
 
 from __future__ import annotations
 
+import json
 import logging
 
 import dash
@@ -355,3 +357,53 @@ def _build_scenario_list(
         get_scenario_card(s, s.snapshots[-1] if s.snapshots else None)
         for s in scenarios
     ]
+
+
+# ── Hydrate calculator inputs from store ──────────────────────────────────────
+
+
+@callback(
+    Output("input-current-age", "value", allow_duplicate=True),
+    Output("input-retirement-age", "value", allow_duplicate=True),
+    Output("input-current-portfolio", "value", allow_duplicate=True),
+    Output("input-monthly-contribution", "value", allow_duplicate=True),
+    Output("input-annual-spending", "value", allow_duplicate=True),
+    Output("input-nominal-return", "value", allow_duplicate=True),
+    Output("input-inflation-rate", "value", allow_duplicate=True),
+    Output("input-barista-income", "value", allow_duplicate=True),
+    Input("store-user-inputs", "data"),
+    prevent_initial_call=True,
+)
+def hydrate_inputs_from_store(data: str | dict | None) -> tuple:
+    """Populate calculator input fields when store-user-inputs is written.
+
+    Triggered whenever load_scenario writes a snapshot's inputs_json into
+    store-user-inputs, allowing the calculator page to reflect the loaded
+    scenario immediately after navigation.
+
+    Rates are stored as decimals in FIInputs but displayed as percentages
+    in the UI (e.g. 0.07 → 7.0).
+
+    Args:
+        data: JSON string or dict from store-user-inputs.
+
+    Returns:
+        Tuple of eight input values in UI display units.
+
+    Raises:
+        PreventUpdate: When data is empty (e.g. on initial page load).
+    """
+    if not data:
+        raise PreventUpdate
+
+    d = json.loads(data) if isinstance(data, str) else data
+    return (
+        d["current_age"],
+        d["retirement_age"],
+        d["current_portfolio"],
+        d["monthly_contribution"],
+        d["annual_spending"],
+        d["nominal_return_rate"] * 100,  # decimal → percent for UI
+        d["inflation_rate"] * 100,  # decimal → percent for UI
+        d["barista_income"],
+    )
