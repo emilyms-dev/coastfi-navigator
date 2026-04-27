@@ -14,6 +14,7 @@ Callback registration order within this file determines which callback
   - generate_share_link  uses allow_duplicate=True for notifications-container
   - load_dashboard_scenarios  uses allow_duplicate=True for dashboard-scenario-list
   - hydrate_inputs_from_store  uses allow_duplicate=True for all 8 input value props
+  - start_new_plan             owns: (none — all allow_duplicate=True)
 """
 
 from __future__ import annotations
@@ -428,3 +429,29 @@ def hydrate_inputs_from_store(data: str | dict | None) -> tuple:
         d["inflation_rate"] * 100,  # decimal → percent for UI
         d["barista_income"],
     )
+
+
+# ── Start new plan ────────────────────────────────────────────────────────────
+
+
+@callback(
+    Output("store-active-scenario-id", "data", allow_duplicate=True),
+    Output("url", "pathname", allow_duplicate=True),
+    Input("btn-new-plan", "n_clicks"),
+    prevent_initial_call=True,
+)
+def start_new_plan(n_clicks: int | None) -> tuple:
+    """Clear the active scenario and navigate to the calculator for a fresh plan.
+
+    Resetting store-active-scenario-id to None ensures the next Save creates
+    a new Scenario row rather than appending to the previously loaded one.
+
+    Args:
+        n_clicks: Click count from the New Plan button on the dashboard.
+
+    Returns:
+        Tuple of (None, "/") to clear the active scenario and navigate home.
+    """
+    if not n_clicks:
+        raise PreventUpdate
+    return None, "/"

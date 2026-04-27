@@ -7,7 +7,7 @@ whenever the user navigates to this page.
 
 import dash
 import dash_mantine_components as dmc
-from dash import dcc, html
+from dash import html
 
 dash.register_page(
     __name__,
@@ -23,10 +23,7 @@ layout = dmc.Container(
             mb="xl",
             children=[
                 dmc.Title("My Scenarios", order=2),
-                dcc.Link(
-                    dmc.Button("+ New Plan", variant="light"),
-                    href="/",
-                ),
+                dmc.Button("+ New Plan", id="btn-new-plan", variant="light"),
             ],
         ),
         # Populated by load_dashboard_scenarios callback on navigation.
