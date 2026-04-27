@@ -71,6 +71,7 @@ def _notification(
     State("store-user-inputs", "data"),
     State("store-simulation-results", "data"),
     State("input-save-scenario-name", "value"),
+    State("store-active-scenario-id", "data"),
     prevent_initial_call=True,
 )
 def save_scenario(
@@ -79,18 +80,25 @@ def save_scenario(
     user_inputs: str | None,
     sim_results: str | None,
     scenario_name: str | None,
+    active_scenario_id: int | None,
 ) -> tuple:
-    """Save the current calculator state as a new scenario snapshot.
+    """Save the current calculator state as a snapshot.
+
+    When store-active-scenario-id holds a scenario the user owns, a new
+    snapshot is appended to that existing scenario (enabling version history).
+    Otherwise a fresh scenario is created. Every save always INSERTs a new
+    snapshot row — no existing snapshot rows are modified.
 
     Unauthenticated users receive a prompt to sign in rather than an error.
-    Every save creates a new snapshot row — no existing rows are modified.
 
     Args:
         n_clicks: Click count from the Save button.
         auth_state: Current auth store payload.
         user_inputs: JSON-serialised FIInputs from store-user-inputs.
         sim_results: JSON-serialised SimulationResult from store-simulation-results.
-        scenario_name: Text input value for the scenario name.
+        scenario_name: Text input value for the scenario name (used only when
+            creating a new scenario).
+        active_scenario_id: ID of the currently loaded scenario, or None.
 
     Returns:
         Tuple of (notification, active_scenario_id).
@@ -116,14 +124,27 @@ def save_scenario(
             no_update,
         )
 
-    name = (scenario_name or "").strip() or "My Plan"
+    user_id = auth_state["user_id"]
 
     try:
-        scenario = crud.create_scenario(auth_state["user_id"], name)
+        # If a scenario is already active and owned by this user, append a new
+        # snapshot to it instead of creating a duplicate scenario.
+        if active_scenario_id:
+            scenario = crud.get_scenario_by_id(active_scenario_id, user_id)
+        else:
+            scenario = None
+
+        if scenario is None:
+            # No active scenario (or it belongs to a different user) — create one.
+            name = (scenario_name or "").strip() or "My Plan"
+            scenario = crud.create_scenario(user_id, name)
+        else:
+            name = scenario.name
+
         crud.save_snapshot(
             scenario_id=scenario.id,
             inputs_json=user_inputs,
-            user_id=auth_state["user_id"],
+            user_id=user_id,
             results_json=sim_results,
         )
         return (
@@ -131,7 +152,7 @@ def save_scenario(
             scenario.id,
         )
     except Exception:
-        logger.exception("Error saving scenario for user %s", auth_state.get("user_id"))
+        logger.exception("Error saving scenario for user %s", user_id)
         return (
             _notification(
                 "Save failed", "Could not save scenario. Please try again.", "red"

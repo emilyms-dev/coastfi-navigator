@@ -16,7 +16,6 @@ Both callbacks are registered with Dash's global callback registry via
 
 from __future__ import annotations
 
-import json
 import logging
 
 import dash
@@ -25,6 +24,7 @@ from dash import Input, Output, State, callback
 from app.components.charts import build_fan_chart
 from app.components.milestones import get_milestone_cards
 from app.components.summary import get_results_summary
+from app.db import crud
 from app.engine.calculator import (
     FIInputs,
     calculate_all_milestones,
@@ -199,26 +199,11 @@ def run_calculation(
     ]
 
     # ── 4. Serialise for dcc.Store ────────────────────────────────────────────
-    sim_store = json.dumps(
-        {
-            "success_rate": sim_result.success_rate,
-            "n_simulations": sim_result.n_simulations,
-            "fi_number": sim_result.fi_number,
-            "inputs_snapshot": sim_result.inputs_snapshot,
-        }
-    )
-    inputs_store = json.dumps(
-        {
-            "current_age": fi_inputs.current_age,
-            "retirement_age": fi_inputs.retirement_age,
-            "current_portfolio": fi_inputs.current_portfolio,
-            "monthly_contribution": fi_inputs.monthly_contribution,
-            "annual_spending": fi_inputs.annual_spending,
-            "nominal_return_rate": fi_inputs.nominal_return_rate,
-            "inflation_rate": fi_inputs.inflation_rate,
-            "barista_income": fi_inputs.barista_income,
-        }
-    )
+    # Use crud serializers so the store payload is identical to what is
+    # persisted in ScenarioSnapshot — share page deserialisation then
+    # always succeeds without a separate conversion step.
+    sim_store = crud.serialize_results(sim_result)
+    inputs_store = crud.serialize_inputs(fi_inputs)
 
     return (
         figure,
