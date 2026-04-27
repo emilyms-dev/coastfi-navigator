@@ -31,7 +31,8 @@ RUN pip install --upgrade pip && \
         "scipy>=1.12" \
         "bcrypt>=4.1" \
         "python-dotenv>=1.0" \
-        "flask-login>=0.6"
+        "flask-login>=0.6" \
+        "dash-iconify>=0.1.2"
 
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
 # Slim image with only the venv from the builder stage — no gcc, no dev packages.

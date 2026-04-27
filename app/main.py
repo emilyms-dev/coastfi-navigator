@@ -39,10 +39,11 @@ server = app.server
 # deployment error that should fail loudly, not silently use an insecure value.
 server.secret_key = os.environ["SECRET_KEY"]
 
-from app.layout import get_layout  # noqa: E402 — import after app is created
-from app.auth import users as auth  # noqa: E402 — import after app is created
-from app.callbacks import auth as _auth_callbacks  # noqa: F401, E402 — registers auth sync callback
-from app.callbacks import calculation as _calc_callbacks  # noqa: F401, E402 — registers calculation callbacks
+from app.auth import users as auth  # noqa: E402
+from app.callbacks import auth as _auth_callbacks  # noqa: F401, E402
+from app.callbacks import calculation as _calc_callbacks  # noqa: F401, E402
+from app.callbacks import persistence as _persistence_callbacks  # noqa: F401, E402
+from app.layout import get_layout  # noqa: E402
 
 app.layout = get_layout()
 
@@ -121,6 +122,7 @@ def _me() -> tuple:
     if user is None:
         return jsonify({"authenticated": False}), 200
     return jsonify(auth.build_auth_store_payload(user)), 200
+
 
 # ── Database startup check ────────────────────────────────────────────────────
 

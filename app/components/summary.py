@@ -48,7 +48,6 @@ def get_results_summary(
         A dmc.Paper containing three stat cards and a plain-language alert.
     """
     rate = sim_result.success_rate
-    retirement_age = result.years_to_retirement  # years, not age
 
     # Success probability color
     if rate >= 0.75:
@@ -77,9 +76,9 @@ def get_results_summary(
         alert_color = "red"
         alert_title = "Plan needs attention"
         alert_msg = (
-            f"Your current plan succeeds in fewer than half of simulations. "
-            f"Review your inputs — small changes to contributions or retirement "
-            f"age can significantly improve your outlook."
+            "Your current plan succeeds in fewer than half of simulations. "
+            "Review your inputs — small changes to contributions or retirement "
+            "age can significantly improve your outlook."
         )
 
     return dmc.Paper(
