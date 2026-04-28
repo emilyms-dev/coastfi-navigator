@@ -164,7 +164,12 @@ def handle_register(
         flask_session["user_id"] = user.id
         return "", build_auth_store_payload(user), False
     except ValueError as exc:
-        return dmc.Text(str(exc), c="red", size="sm"), no_update, no_update
+        msg = str(exc)
+        # Suppress "already exists" messages to prevent email enumeration.
+        # Surface only validation errors (format, length) verbatim.
+        if "already exists" in msg:
+            msg = "Could not create account. Please try a different email."
+        return dmc.Text(msg, c="red", size="sm"), no_update, no_update
     except Exception:
         logger.exception("Unexpected error during register callback")
         return (

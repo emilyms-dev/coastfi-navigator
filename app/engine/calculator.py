@@ -45,11 +45,20 @@ class FIInputs:
     def validate(self) -> None:
         """Validate input values and raise ValueError on any invalid state.
 
+        Idempotent — safe to call multiple times on the same instance.
+        Called internally by calculate_all_milestones and
+        calculate_deterministic_projection; callers that invoke both will
+        double-validate, which is harmless.
+
         Raises:
             ValueError: If any field is outside its acceptable range. Each invalid
                 state produces a descriptive message identifying the field and
                 the constraint that was violated.
         """
+        if self.current_portfolio < 0:
+            raise ValueError(
+                f"current_portfolio ({self.current_portfolio}) must be non-negative"
+            )
         if self.retirement_age <= self.current_age:
             raise ValueError(
                 f"retirement_age ({self.retirement_age}) must be greater than "

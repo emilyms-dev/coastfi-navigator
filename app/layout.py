@@ -16,9 +16,9 @@ from app.components.auth_modal import get_auth_modal
 # Defined once here and passed to MantineProvider — never inline color hex codes.
 
 THEME = {
-    "colorScheme": "light",
+    # "colorScheme" is a Mantine v6 key ignored by v7/DMC 2.x.
+    # Use forceColorScheme="light" on MantineProvider if locking color mode.
     "primaryColor": "blue",
-    "colors": {},
     "fontFamily": "'Inter', 'Segoe UI', sans-serif",
     "defaultRadius": "md",
     "components": {
@@ -78,7 +78,11 @@ def get_layout() -> dmc.MantineProvider:
     """
     return dmc.MantineProvider(
         theme=THEME,
+        forceColorScheme="light",
         children=[
+            # NotificationProvider enables dmc.Notification(action="show")
+            # to render as real toasts rather than static inline blocks.
+            dmc.NotificationProvider(position="top-right"),
             dmc.AppShell(
                 header={"height": 60},
                 padding="md",
@@ -136,6 +140,6 @@ def get_layout() -> dmc.MantineProvider:
                         ]
                     ),
                 ],
-            )
+            ),
         ],
     )
