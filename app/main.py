@@ -133,26 +133,36 @@ def me_route() -> tuple:
 
 
 # ── Health endpoint ───────────────────────────────────────────────────────────
+# Implemented as a before_request hook rather than @server.route because
+# Dash 4 with use_pages=True registers a catch-all GET handler that serves
+# the React shell HTML for every path (to support client-side routing). That
+# catch-all intercepts GET /health before Flask's own route matching reaches
+# the @server.route handler. before_request fires before any route matching,
+# so it short-circuits correctly for /health without affecting other requests.
 
 
-@server.route("/health", methods=["GET"])
-def health_route() -> tuple:
-    """Lightweight health check for orchestrators and monitoring tools.
+@server.before_request
+def health_check_intercept() -> tuple | None:
+    """Intercept GET /health before Dash's catch-all page handler fires.
 
     Performs a SELECT 1 against the database. Returns 200 when the DB is
-    reachable, 503 when it is not. Suitable for container HEALTHCHECK directives
-    and load-balancer probes.
+    reachable, 503 when it is not. All other paths return None so normal
+    routing continues unaffected. Suitable for container HEALTHCHECK
+    directives and load-balancer probes.
 
     Returns:
         200: {"status": "ok", "db": "connected"}
         503: {"status": "degraded", "db": "unreachable"}
+        None: for all other paths (normal request handling continues)
     """
+    if request.path != "/health" or request.method != "GET":
+        return None
     database_url = os.environ.get("DATABASE_URL")
     if not database_url:
         return jsonify({"status": "degraded", "db": "unreachable"}), 503
     try:
-        engine = create_engine(database_url)
-        with engine.connect() as conn:
+        health_engine = create_engine(database_url)
+        with health_engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         return jsonify({"status": "ok", "db": "connected"}), 200
     except Exception:
