@@ -144,9 +144,7 @@ def seed() -> None:
             sim_result.success_rate * 100,
         )
 
-    logger.info(
-        "Seed complete. Log in with %s / %s", DEMO_EMAIL, DEMO_PASSWORD
-    )
+    logger.info("Seed complete. Log in with %s / %s", DEMO_EMAIL, DEMO_PASSWORD)
 
 
 if __name__ == "__main__":
