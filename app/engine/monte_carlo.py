@@ -110,13 +110,19 @@ def run_simulation(
     # Compound growth factors per run per year, then cumulative product gives
     # the multiplier applied to the starting portfolio up to and including
     # each year. Coast FI assumes no new contributions after today.
-    growth_factors = 1.0 + real_returns
+    # Clamp to 0.01 to prevent sign-flipping from extreme left-tail draws
+    # (theoretical probability ~5e-8 per sample at normal inputs).
+    growth_factors = np.maximum(1.0 + real_returns, 0.01)
     cumulative_growth = np.cumprod(growth_factors, axis=1)
     portfolio_paths = inputs.current_portfolio * cumulative_growth
 
     # Prepend the starting portfolio column so paths cover current_age through
     # retirement_age inclusive (years_to_retirement + 1 columns).
-    starting_column = np.full((n_simulations, 1), inputs.current_portfolio)
+    # dtype=float64 is explicit: integer portfolio inputs would otherwise
+    # produce an integer-typed array and silently truncate growth calculations.
+    starting_column = np.full(
+        (n_simulations, 1), inputs.current_portfolio, dtype=np.float64
+    )
     portfolio_paths = np.concatenate([starting_column, portfolio_paths], axis=1)
 
     # Percentile bands across the simulation axis for every year.

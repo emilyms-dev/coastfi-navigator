@@ -18,21 +18,15 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Copy only the dependency manifest first to leverage Docker layer caching
 COPY pyproject.toml ./
 
-# Install pip then production deps only — dev group is intentionally excluded
+# Install pip then production deps from pyproject.toml — single source of truth.
+# tomllib is stdlib in Python 3.11+; reads [project.dependencies] directly so
+# the container always installs the same pinned constraints as the test env.
+# Dev dependencies (hypothesis, black, ruff, …) are intentionally excluded.
 RUN pip install --upgrade pip && \
-    pip install \
-        "dash>=2.17" \
-        "dash-mantine-components>=0.14" \
-        "plotly>=5.20" \
-        "sqlalchemy>=2.0" \
-        "alembic>=1.13" \
-        "psycopg2-binary>=2.9" \
-        "numpy>=1.26" \
-        "scipy>=1.12" \
-        "bcrypt>=4.1" \
-        "python-dotenv>=1.0" \
-        "flask-login>=0.6" \
-        "dash-iconify>=0.1.2"
+    python -c "\
+import tomllib, subprocess, sys; \
+d = tomllib.load(open('pyproject.toml', 'rb')); \
+subprocess.check_call([sys.executable, '-m', 'pip', 'install'] + d['project']['dependencies'])"
 
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
 # Slim image with only the venv from the builder stage — no gcc, no dev packages.
@@ -54,6 +48,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy application source
 COPY app/ ./app/
+COPY scripts/ ./scripts/
 COPY migrations/ ./migrations/
 COPY alembic.ini ./
 COPY pyproject.toml ./

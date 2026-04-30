@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 
 import dash
+import dash_mantine_components as dmc
 from dash import Input, Output, State, callback
 
 from app.components.charts import build_fan_chart
@@ -83,9 +84,20 @@ def arm_debounce(*_values: object) -> tuple[bool, int]:
     Output("calc-milestone-container", "children"),
     Output("store-simulation-results", "data"),
     Output("store-user-inputs", "data"),
+    # allow_duplicate=True: arm_debounce owns the `disabled` output; this
+    # callback uses the same output to DISARM the interval after calculation.
+    # The arm/disarm pattern is intentional — see module docstring.
     Output("calc-debounce-trigger", "disabled", allow_duplicate=True),
+    # allow_duplicate=True: save_scenario owns notifications-container;
+    # this callback uses it only to surface calculation errors.
+    Output("notifications-container", "children", allow_duplicate=True),
     Input("calc-debounce-trigger", "n_intervals"),
     [State(id_, "value") for id_ in _INPUT_IDS],
+    # Used to detect whether inputs changed vs the previous store state.
+    # If identical, store-user-inputs is left unchanged to break the
+    # hydrate_inputs_from_store → arm_debounce → run_calculation loop that
+    # would otherwise fire once after every scenario load.
+    State("store-user-inputs", "data"),
     prevent_initial_call=True,
 )
 def run_calculation(
@@ -98,6 +110,7 @@ def run_calculation(
     nominal_return_pct: object,
     inflation_rate_pct: object,
     barista_income: object,
+    prev_inputs_store: str | None,
 ) -> tuple:
     """Execute the full FI calculation and update all result components.
 
@@ -121,15 +134,13 @@ def run_calculation(
         inflation_rate_pct: Expected annual inflation as a percentage
             (e.g. 3.0 for 3%).
         barista_income: Annual part-time income in USD (may be 0).
+        prev_inputs_store: Previous store-user-inputs JSON, used to detect
+            unchanged inputs and suppress redundant store writes.
 
     Returns:
-        Tuple of:
-            - go.Figure  — updated fan chart
-            - list       — summary container children
-            - list       — milestone container children
-            - str | None — serialised SimulationResult for store (JSON)
-            - str | None — serialised inputs for store (JSON)
-            - bool       — calc-debounce-trigger disabled=True
+        7-tuple of: figure, summary children, milestone children,
+        sim_store JSON, inputs_store JSON (or no_update), interval disabled,
+        notification (or no_update).
     """
     # Always disable interval so it doesn't repeat every 400ms.
     _interval_disabled = True
@@ -145,8 +156,9 @@ def run_calculation(
         inflation_rate_pct,
         barista_income,
     ]
-    # _no_update_with_disable: returned on any validation/engine failure.
-    # UI outputs are left unchanged; interval is disabled so it stops firing.
+    # _no_update_with_disable: returned on any failure. UI outputs are left
+    # unchanged; interval is disabled so it stops firing; no notification
+    # for the None-inputs case (user is still typing).
     _no_update_with_disable = (
         dash.no_update,  # calc-fan-chart figure
         dash.no_update,  # calc-summary-container children
@@ -154,6 +166,7 @@ def run_calculation(
         dash.no_update,  # store-simulation-results data
         dash.no_update,  # store-user-inputs data
         True,  # calc-debounce-trigger disabled — stop the interval
+        dash.no_update,  # notifications-container — no feedback for None inputs
     )
 
     if any(v is None for v in raw_inputs):
@@ -182,10 +195,42 @@ def run_calculation(
         deterministic = calculate_deterministic_projection(fi_inputs)
     except ValueError as exc:
         logger.warning("Calculation validation error: %s", exc)
-        return _no_update_with_disable
+        notif = dmc.Notification(
+            id="calc-error-notification",
+            title="Invalid inputs",
+            message=str(exc),
+            color="red",
+            action="show",
+            autoClose=5000,
+        )
+        return (
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+            True,
+            notif,
+        )
     except Exception:
         logger.exception("Unexpected error during FI calculation")
-        return _no_update_with_disable
+        notif = dmc.Notification(
+            id="calc-error-notification",
+            title="Calculation error",
+            message="An unexpected error occurred. Please check your inputs.",
+            color="red",
+            action="show",
+            autoClose=5000,
+        )
+        return (
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+            True,
+            notif,
+        )
 
     # ── 3. Build UI components ────────────────────────────────────────────────
     figure = build_fan_chart(
@@ -205,11 +250,20 @@ def run_calculation(
     sim_store = crud.serialize_results(sim_result)
     inputs_store = crud.serialize_inputs(fi_inputs)
 
+    # N10 guard: only write store-user-inputs when inputs actually changed.
+    # Writing an identical value would trigger hydrate_inputs_from_store,
+    # which re-arms the debounce, causing one extra calculation cycle after
+    # every scenario load.
+    final_inputs_store = (
+        dash.no_update if inputs_store == prev_inputs_store else inputs_store
+    )
+
     return (
         figure,
         summary_children,
         milestone_children,
         sim_store,
-        inputs_store,
+        final_inputs_store,
         _interval_disabled,
+        dash.no_update,  # no notification on success
     )

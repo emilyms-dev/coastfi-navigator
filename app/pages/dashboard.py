@@ -7,7 +7,6 @@ whenever the user navigates to this page.
 
 import dash
 import dash_mantine_components as dmc
-from dash import html
 
 dash.register_page(
     __name__,
@@ -28,7 +27,7 @@ layout = dmc.Container(
         ),
         # Populated by load_dashboard_scenarios callback on navigation.
         # Skeletons shown as placeholders before the callback fires.
-        html.Div(
+        dmc.Box(
             id="dashboard-scenario-list",
             children=[dmc.Skeleton(height=120, mb="sm") for _ in range(3)],
         ),

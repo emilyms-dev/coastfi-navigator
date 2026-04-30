@@ -10,6 +10,8 @@ is handled in Python (uuid.uuid4()), so portability is not a concern here.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -328,3 +330,88 @@ def test_results_serialization_round_trip(db_session) -> None:
     assert set(restored.percentile_bands.keys()) == {10, 25, 50, 75, 90}
     for pct in (10, 25, 50, 75, 90):
         assert len(restored.percentile_bands[pct]) == len(result.percentile_bands[pct])
+
+
+# ── Model __repr__ tests (Phase 3 N3) ────────────────────────────────
+
+
+def test_user_repr(db_session) -> None:
+    user = crud_module.create_user("repr_user@example.com", "hash")
+    r = repr(user)
+    assert "User(" in r
+    assert "repr_user@example.com" in r
+
+
+def test_scenario_repr(db_session) -> None:
+    user = crud_module.create_user("repr_scenario@example.com", "hash")
+    scenario = crud_module.create_scenario(user.id, "Repr Test Plan")
+    r = repr(scenario)
+    assert "Scenario(" in r
+    assert "Repr Test Plan" in r
+
+
+def test_snapshot_repr(db_session) -> None:
+    user = crud_module.create_user("repr_snap@example.com", "hash")
+    scenario = crud_module.create_scenario(user.id, "Plan")
+    inputs_json = crud_module.serialize_inputs(_make_inputs())
+    snap = crud_module.save_snapshot(scenario.id, inputs_json, user.id)
+    r = repr(snap)
+    assert "ScenarioSnapshot(" in r
+    assert str(snap.version) in r
+
+
+# ── Detached-instance attribute test (Phase 3 N4) ────────────────────
+
+
+def test_detached_scenario_attributes_accessible(db_session) -> None:
+    """Eagerly-loaded .snapshots must be accessible after the session closes.
+
+    get_scenarios_for_user uses selectinload — this confirms that accessing
+    .snapshots on a detached Scenario does not raise DetachedInstanceError,
+    i.e., the eager-load assumption holds against the test DB.
+    """
+    user = crud_module.create_user("detach@example.com", "hash")
+    scenario = crud_module.create_scenario(user.id, "Detach Plan")
+    inputs_json = crud_module.serialize_inputs(_make_inputs())
+    crud_module.save_snapshot(scenario.id, inputs_json, user.id)
+
+    # Objects returned by get_scenarios_for_user are detached (session closed).
+    scenarios = crud_module.get_scenarios_for_user(user.id)
+    assert len(scenarios) == 1
+    detached = scenarios[0]
+    # Accessing the relationship must not raise DetachedInstanceError.
+    assert len(detached.snapshots) == 1
+    assert detached.snapshots[0].version == 1
+
+
+# ── Serialization key-set tests (Phase 3 S1) ─────────────────────────
+
+
+def test_serialize_inputs_key_set(db_session) -> None:
+    inputs = _make_inputs()
+    payload = json.loads(crud_module.serialize_inputs(inputs))
+    assert set(payload.keys()) == {
+        "current_age",
+        "retirement_age",
+        "current_portfolio",
+        "monthly_contribution",
+        "annual_spending",
+        "nominal_return_rate",
+        "inflation_rate",
+        "lean_multiplier",
+        "barista_income",
+    }
+
+
+def test_serialize_results_key_set(db_session) -> None:
+    inputs = _make_inputs()
+    result = run_simulation(inputs, n_simulations=100, rng_seed=42)
+    payload = json.loads(crud_module.serialize_results(result))
+    assert set(payload.keys()) == {
+        "success_rate",
+        "n_simulations",
+        "fi_number",
+        "ages",
+        "percentile_bands",
+        "inputs_snapshot",
+    }

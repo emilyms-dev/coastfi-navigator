@@ -192,9 +192,12 @@ def delete_scenario(
         raise PreventUpdate
 
     auth_state = auth_state or {}
+    if not auth_state.get("authenticated"):
+        raise PreventUpdate
+
     scenario_id = ctx.triggered_id["index"]
 
-    deleted = crud.delete_scenario(scenario_id, auth_state.get("user_id", -1))
+    deleted = crud.delete_scenario(scenario_id, auth_state["user_id"])
 
     # Rebuild the list regardless of deletion outcome.
     updated_list = _build_scenario_list(auth_state)
@@ -236,17 +239,19 @@ def load_scenario(
     if not any(n_clicks_list):
         raise PreventUpdate
 
-    _no_change = (no_update, no_update, no_update, no_update, no_update)
-
     auth_state = auth_state or {}
-    scenario_id = ctx.triggered_id["index"]
+    if not auth_state.get("authenticated"):
+        raise PreventUpdate
 
-    scenario = crud.get_scenario_by_id(scenario_id, auth_state.get("user_id", -1))
+    scenario_id = ctx.triggered_id["index"]
+    user_id = auth_state["user_id"]
+
+    scenario = crud.get_scenario_by_id(scenario_id, user_id)
     if not scenario:
         notif = _notification("Error", "Scenario not found.", "red")
         return no_update, no_update, no_update, no_update, notif
 
-    snapshot = crud.get_latest_snapshot(scenario_id, auth_state.get("user_id", -1))
+    snapshot = crud.get_latest_snapshot(scenario_id, user_id)
     if not snapshot:
         notif = _notification("Empty", "This scenario has no saved data.", "blue")
         return no_update, no_update, no_update, no_update, notif
@@ -287,10 +292,13 @@ def generate_share_link(
         raise PreventUpdate
 
     auth_state = auth_state or {}
+    if not auth_state.get("authenticated"):
+        raise PreventUpdate
+
     scenario_id = ctx.triggered_id["index"]
 
     try:
-        token = crud.generate_share_token(scenario_id, auth_state.get("user_id", -1))
+        token = crud.generate_share_token(scenario_id, auth_state["user_id"])
         share_url = f"/share/{token}"
         return dmc.Notification(
             id="active-notification",

@@ -44,7 +44,7 @@ def get_scenario_card(
         )
 
     return dmc.Paper(
-        [
+        children=[
             dmc.Group(
                 justify="space-between",
                 mb="xs",
@@ -59,7 +59,7 @@ def get_scenario_card(
             dmc.Text(preview_text, size="sm", c="dimmed", mb="sm"),
             dmc.Text(f"Saved {snapshot_date}", size="xs", c="dimmed", mb="md"),
             dmc.Group(
-                [
+                children=[
                     dmc.Button(
                         "Load",
                         id={"type": "btn-load-scenario", "index": scenario.id},

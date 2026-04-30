@@ -61,9 +61,11 @@ def test_seeded_simulation_reproducible() -> None:
     assert a.success_rate == b.success_rate
 
 
-def test_unseeded_simulations_differ() -> None:
-    a = run_simulation(KNOWN_INPUTS, n_simulations=500, rng_seed=None)
-    b = run_simulation(KNOWN_INPUTS, n_simulations=500, rng_seed=None)
+def test_distinct_seeds_produce_different_bands() -> None:
+    # Use two distinct fixed seeds rather than rng_seed=None to avoid
+    # the vanishingly small but non-zero risk of identical random outputs.
+    a = run_simulation(KNOWN_INPUTS, n_simulations=500, rng_seed=1)
+    b = run_simulation(KNOWN_INPUTS, n_simulations=500, rng_seed=2)
     assert a.percentile_bands[50] != b.percentile_bands[50]
 
 
